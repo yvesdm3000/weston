@@ -29,7 +29,7 @@
 #include <inttypes.h>
 #include <stdbool.h>
 #include <unistd.h>
-#include <drm_fourcc.h>
+#include <drm/drm_fourcc.h>
 
 #include "helpers.h"
 #include "wayland-util.h"
