@@ -261,6 +261,17 @@ if test x$enable_rdp_compositor = xyes; then
   CPPFLAGS="$SAVED_CPPFLAGS"
 fi
 
+AC_ARG_ENABLE([rtpvideo-compositor], [  --enable-rtpvideo-compositor],,
+              enable_rtpvideo_compositor=no)
+AM_CONDITIONAL([ENABLE_RTPVIDEO_COMPOSITOR],
+               [test x$enable_rtpvideo_compositor = xyes])
+if test x$enable_rtpvideo_compositor = xyes; then
+  AC_DEFINE([BUILD_RTPVIDEO_COMPOSITOR], [1], [Build the RTPVIDEO compositor])
+  PKG_CHECK_MODULES([RTPVIDEO_COMPOSITOR], [librtpvideo >= 0.0.1])
+  RTPVIDEO_COMPOSITOR_MODULES="rtpvideo"
+fi
+
+
 AC_ARG_ENABLE([screen-sharing], [  --enable-screen-sharing],,
               enable_screen_sharing=no)
 AM_CONDITIONAL([ENABLE_SCREEN_SHARING],
@@ -709,6 +720,7 @@ AC_MSG_RESULT([
 	Headless Compositor		${enable_headless_compositor}
 	FBDEV Compositor		${enable_fbdev_compositor}
 	RDP Compositor			${enable_rdp_compositor}
+	RTPVIDEO Compositor		${enable_rtpvideo_compositor}
 	Screen Sharing			${enable_screen_sharing}
 	JUnit XML output		${enable_junit_xml}
 
