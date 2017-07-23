@@ -60,6 +60,7 @@
 #include "compositor-drm.h"
 #include "compositor-headless.h"
 #include "compositor-rdp.h"
+#include "compositor-rtpvideo.h"
 #include "compositor-fbdev.h"
 #include "compositor-x11.h"
 #include "compositor-wayland.h"
@@ -544,6 +545,9 @@ usage(int error_code)
 #if defined(BUILD_RDP_COMPOSITOR)
 			"\t\t\t\trdp-backend.so\n"
 #endif
+#if defined(BUILD_RTPVIDEO_COMPOSITOR)
+			"\t\t\t\trtpvideo-backend.so\n"
+#endif
 #if defined(BUILD_WAYLAND_COMPOSITOR)
 			"\t\t\t\twayland-backend.so\n"
 #endif
@@ -601,6 +605,20 @@ usage(int error_code)
 		"  --rdp4-key=FILE\tThe file containing the key for RDP4 encryption\n"
 		"  --rdp-tls-cert=FILE\tThe file containing the certificate for TLS encryption\n"
 		"  --rdp-tls-key=FILE\tThe file containing the private key for TLS encryption\n"
+		"\n");
+#endif
+
+#if defined(BUILD_RTPVIDEO_COMPOSITOR)
+	fprintf(stderr,
+		"Options for rtpvideo-backend.so:\n\n"
+		"  --width=WIDTH\t\tWidth of desktop\n"
+		"  --height=HEIGHT\tHeight of desktop\n"
+		"  --colorspace=COLOR One of: RGB, BGR, RGBA, BGRA\n"
+		"  --address=ADDR\tThe address to bind\n"
+		"  --port=PORT\t\tThe port to bind to\n"
+		"  --destination=ADDR\tThe address to send video to. This can be a multicast address. Required.\n"
+		"  --destination-port=PORT\t\tThe port to send video to. Required.\n"
+		"  --ssrc=num\t\tThe SSRC to use in the RTP packets. Optional.\n"
 		"\n");
 #endif
 
@@ -1421,6 +1439,93 @@ out:
 	return ret;
 }
 
+
+static void
+rtpvideo_backend_output_configure(struct wl_listener *listener, void *data)
+{
+	struct weston_output *output = data;
+	struct wet_compositor *compositor = to_wet_compositor(output->compositor);
+	struct wet_output_config *parsed_options = compositor->parsed_options;
+	const struct rtpvideo_output_api *api = rtpvideo_output_get_api(output->compositor);
+	int width = 640;
+	int height = 480;
+
+	assert(parsed_options);
+
+	if (!api)
+		return;
+
+	if (parsed_options->width)
+		width = parsed_options->width;
+
+	if (parsed_options->height)
+		height = parsed_options->height;
+
+	weston_output_set_scale(output, 1);
+	weston_output_set_transform(output, WL_OUTPUT_TRANSFORM_NORMAL);
+
+	if (api->output_set_size(output, width, height) < 0) {
+		weston_log("Cannot configure output \"%s\" using rtpvideo_output_api.\n",
+			   output->name);
+		return;
+	}
+
+	weston_output_enable(output);
+}
+
+static void
+rtpvideo_backend_config_init(struct rtpvideo_backend_config *config)
+{
+	config->base.struct_version = RTPVIDEO_BACKEND_CONFIG_VERSION;
+	config->base.struct_size = sizeof(struct rtpvideo_backend_config);
+
+	config->bind_address = NULL;
+	config->bind_port = 0;
+        config->destination_address = NULL;
+        config->destination_port = 49410;;
+}
+
+static int
+load_rtpvideo_backend(struct weston_compositor *c,
+		int *argc, char *argv[], struct weston_config *wc)
+{
+	struct rtpvideo_backend_config config  = {{ 0, }};
+	int ret = 0;
+
+	struct wet_output_config *parsed_options = wet_init_parsed_options(c);
+	if (!parsed_options) {
+                weston_log("Failed to initialized parsed options\n");
+		return -1;
+        }
+	rtpvideo_backend_config_init(&config);
+
+	const struct weston_option rtpvideo_options[] = {
+		{ WESTON_OPTION_INTEGER, "width", 0, &parsed_options->width },
+		{ WESTON_OPTION_INTEGER, "height", 0, &parsed_options->height },
+		{ WESTON_OPTION_STRING,  "address", 0, &config.bind_address },
+		{ WESTON_OPTION_INTEGER, "port", 0, &config.bind_port },
+		{ WESTON_OPTION_STRING,  "destination", 0, &config.destination_address },
+		{ WESTON_OPTION_INTEGER, "destination-port", 0, &config.destination_port },
+		{ WESTON_OPTION_INTEGER, "ssrc", 0, &config.ssrc }
+	};
+
+	parse_options(rtpvideo_options, ARRAY_LENGTH(rtpvideo_options), argc, argv);
+
+	ret = weston_compositor_load_backend(c, WESTON_BACKEND_RTPVIDEO,
+					     &config.base);
+
+	if (ret < 0)
+		goto out;
+
+	wet_set_pending_output_handler(c, rtpvideo_backend_output_configure);
+
+out:
+	free(config.bind_address);
+	free(config.destination_address);
+
+	return ret;
+}
+
 static void
 fbdev_backend_output_configure(struct wl_listener *listener, void *data)
 {
@@ -1722,6 +1827,8 @@ load_backend(struct weston_compositor *compositor, const char *backend,
 		return load_headless_backend(compositor, argc, argv, config);
 	else if (strstr(backend, "rdp-backend.so"))
 		return load_rdp_backend(compositor, argc, argv, config);
+	else if (strstr(backend, "rtpvideo-backend.so"))
+		return load_rtpvideo_backend(compositor, argc, argv, config);
 	else if (strstr(backend, "fbdev-backend.so"))
 		return load_fbdev_backend(compositor, argc, argv, config);
 	else if (strstr(backend, "drm-backend.so"))

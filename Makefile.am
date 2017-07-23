@@ -87,6 +87,7 @@ libweston_@LIBWESTON_MAJOR@_la_SOURCES =			\
 	libweston/compositor-fbdev.h			\
 	libweston/compositor-headless.h			\
 	libweston/compositor-rdp.h			\
+	libweston/compositor-rtpvideo.h			\
 	libweston/compositor-wayland.h			\
 	libweston/compositor-x11.h			\
 	libweston/input.c				\
@@ -297,6 +298,7 @@ libwestoninclude_HEADERS =			\
 	libweston/compositor-fbdev.h		\
 	libweston/compositor-headless.h		\
 	libweston/compositor-rdp.h		\
+	libweston/compositor-rtpvideo.h		\
 	libweston/compositor-wayland.h		\
 	libweston/compositor-x11.h		\
 	libweston/windowed-output-api.h		\
@@ -478,6 +480,24 @@ rdp_backend_la_CFLAGS =				\
 rdp_backend_la_SOURCES = 			\
 	libweston/compositor-rdp.c		\
 	libweston/compositor-rdp.h		\
+	shared/helpers.h
+endif
+
+if ENABLE_RTPVIDEO_COMPOSITOR
+libweston_module_LTLIBRARIES += rtpvideo-backend.la
+rtpvideo_backend_la_LDFLAGS = -module -avoid-version
+rtpvideo_backend_la_LIBADD =			\
+	libshared.la				\
+	libweston-@LIBWESTON_MAJOR@.la		\
+	$(COMPOSITOR_LIBS)		\
+	$(RTPVIDEO_COMPOSITOR_LIBS)
+rtpvideo_backend_la_CFLAGS =			\
+	$(COMPOSITOR_CFLAGS)			\
+	$(RTPVIDEO_COMPOSITOR_CFLAGS)		\
+	$(AM_CFLAGS)
+rtpvideo_backend_la_SOURCES = 			\
+	libweston/compositor-rtpvideo.c		\
+	libweston/compositor-rtpvideo.h		\
 	shared/helpers.h
 endif
 
